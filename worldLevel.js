@@ -32,7 +32,12 @@ class WorldLevel {
 
     // Theme defaults + override with JSON.
     this.theme = Object.assign(
-      { bg: "#F0F0F0", platform: "#C8C8C8", blob: "#1478FF" },
+      {
+        bg: "#F0F0F0",
+        platform: "#C8C8C8",
+        blob: "#1478FF",
+        obstacle: "#FF4D4D",
+      },
       levelJson.theme || {},
     );
 
@@ -41,21 +46,33 @@ class WorldLevel {
     this.jumpV = levelJson.jumpV ?? -11.0;
 
     // Player spawn data.
-    // Use optional chaining so levels can omit fields safely.
     this.start = {
       x: levelJson.start?.x ?? 80,
       y: levelJson.start?.y ?? 180,
       r: levelJson.start?.r ?? 26,
     };
 
-    // Convert raw platform objects into Platform instances.
+    // Convert raw platform objects into Platform instances
     this.platforms = (levelJson.platforms || []).map((p) => new Platform(p));
+
+    // --- NEW: Generate obstacles from JSON ---
+    this.obstacles = [];
+    if (levelJson.obstaclePatterns) {
+      levelJson.obstaclePatterns.forEach((pattern) => {
+        for (let i = 0; i < pattern.count; i++) {
+          this.obstacles.push(
+            new Obstacle({
+              x: pattern.startX + i * pattern.spacing,
+              y: pattern.y,
+              size: pattern.size,
+              type: pattern.type,
+            }),
+          );
+        }
+      });
+    }
   }
 
-  /*
-  If you want the canvas to fit the world, you can infer width/height by
-  finding the maximum x+w and y+h across all platforms.
-  */
   inferWidth(defaultW = 640) {
     if (!this.platforms.length) return defaultW;
     return max(this.platforms.map((p) => p.x + p.w));
@@ -66,14 +83,17 @@ class WorldLevel {
     return max(this.platforms.map((p) => p.y + p.h));
   }
 
-  /*
-  Draw only the world (background + platforms).
-  The player draws itself separately, after the world is drawn.
-  */
   drawWorld() {
+    // Draw background
     background(color(this.theme.bg));
-    for (const p of this.platforms) {
-      p.draw(color(this.theme.platform));
-    }
+
+    // Draw platforms
+    this.platforms.forEach((p) => p.draw(color(this.theme.platform)));
+
+    // Update + draw obstacles
+    this.obstacles.forEach((o) => {
+      o.update(); // MOVE the obstacle
+      o.draw(color(this.theme.obstacle)); // draw it
+    });
   }
 }
